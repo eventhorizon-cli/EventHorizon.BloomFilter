@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using Murmur;
 
@@ -58,6 +59,7 @@ public class BloomFilter<T>
     }
 
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private (long Hash1, long Hash2) Hash(T item)
     {
         byte[] inputBytes;
@@ -67,18 +69,10 @@ public class BloomFilter<T>
             inputBytes = sink.GetBytes();
         }
 
-        var hash = _murmur128.ComputeHash(inputBytes);
-
-        long hash1 = LowerEight(hash);
-        long hash2 = UpperEight(hash);
-        return (hash1, hash2);
+        var hashSpan = _murmur128.ComputeHash(inputBytes).AsSpan();
+        
+        long lowerEight = BinaryPrimitives.ReadInt64LittleEndian(hashSpan.Slice(0,8));
+        long upperEight = BinaryPrimitives.ReadInt64LittleEndian(hashSpan.Slice(8,8));
+        return (lowerEight, upperEight);
     }
-
-    private long LowerEight(byte[] bytes) =>
-        BinaryPrimitives.ReadInt64BigEndian(
-            new[] { bytes[7], bytes[6], bytes[5], bytes[4], bytes[3], bytes[2], bytes[1], bytes[0] });
-
-    private long UpperEight(byte[] bytes) =>
-        BinaryPrimitives.ReadInt64BigEndian(
-            new[] { bytes[15], bytes[14], bytes[13], bytes[12], bytes[11], bytes[10], bytes[9], bytes[8] });
 }
